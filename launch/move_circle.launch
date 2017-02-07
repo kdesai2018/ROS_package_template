@@ -1,0 +1,3 @@
+<launch><!-- Start up circle -->
+	<node name="arm_moveit" pkg="pearl_task2" type="arm_moveit.py" output="screen"></node>
+</launch>
