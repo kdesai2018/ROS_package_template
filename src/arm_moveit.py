@@ -43,7 +43,7 @@ class ArmMoveIt:
     ## to one group of joints.  In this case the group is the joints in the left
     ## arm.  This interface can be used to plan and execute   motions on the left
     ## arm.
-    self.group = [moveit_commander.MoveGroupCommander("right_arm")]
+    self.group = [moveit_commander.MoveGroupCommander("right_arm")] #change this to right_arm or left_arm
 
     # Set the planner
     self.planner = default_planner
@@ -52,11 +52,11 @@ class ArmMoveIt:
     self.group[0].set_pose_reference_frame(planning_frame)
     # self.group[1].set_pose_reference_frame(planning_frame)
     # Set continuous joint names
-    self.continuous_joints = ['left_shoulder_pan_joint','left_wrist_1_joint','left_wrist_2_joint','left_wrist_3_joint',
-    'right_shoulder_pan_joint','right_wrist_1_joint','right_wrist_2_joint','right_wrist_3_joint']
+    self.continuous_joints = ['right_shoulder_pan_joint','right_wrist_1_joint','right_wrist_2_joint','right_wrist_3_joint']
     # NOTE: order that moveit currently is configured
     # ['right_shoulder_pan_joint', 'right_shoulder_lift_joint', 'right_elbow_joint', 'right_wrist_1_joint', 'right_wrist_2_joint', 'right_wrist_3_joint']
     self.continuous_joints_list = [0,3,4,5] # joints that are continous
+    
     topic = 'visualization_marker_array'
     self.publisher = rospy.Publisher(topic, MarkerArray)
     rospy.sleep(1)
@@ -80,12 +80,14 @@ class ArmMoveIt:
     wkPose.pose=newPose
 
     msgs_request = moveit_msgs.msg.PositionIKRequest()
-    msgs_request.group_name = self.group[n].get_name() # name: arm
-    # msgs_request.robot_state = robot.get_current_state()
+    msgs_request.group_name = 'left_arm'; # takes in left_arm as argument at all times.
+    # msgs_request.ik_link_name = self.group[n].get_name()
+    print self.group[n].get_name()
+    msgs_request.robot_state = self.robot.get_current_state()
     msgs_request.pose_stamped = wkPose
     msgs_request.timeout.secs = 2
     msgs_request.avoid_collisions = False
-
+    print msgs_request
     try:
       jointAngle=compute_ik(msgs_request)
       ans=list(jointAngle.solution.joint_state.position[1:7])
@@ -96,24 +98,6 @@ class ArmMoveIt:
 
     except rospy.ServiceException, e:
       print "Service call failed: %s"%e
-
-
-  def set_robot_state_pose(self, traj):
-    '''Gets the current robot state pose and sets it to the joint pose'''
-    cur_robot_state = self.robot.get_current_state()
-    last_point = traj.points[-1].positions
-    # convert the joints to array
-    joints = [x for x in cur_robot_state.joint_state.position]
-    for i in xrange(len(traj.joint_names)):
-      # Find index of joint
-      joint_name = traj.joint_names[i]
-      idx = cur_robot_state.joint_state.name.index(joint_name)
-      joints[idx] = last_point[i]
-
-    # Set full joint tuple now
-    cur_robot_state.joint_state.position = joints
-
-    return cur_robot_state
 
 
   def _simplify_angle(self, angle):
@@ -217,17 +201,19 @@ class ArmMoveIt:
 
     tarPose = geometry_msgs.msg.Pose()
 
-    for angle in range(-40,-39,jump):
+    for angle in range(-140,-139,jump):
         tarPose.position = self.calc_mov(angle,radius,center,z)
         tarPose.orientation = self.calc_orientation(angle)
         self.publish_point(tarPose.position.x,tarPose.position.y,tarPose.position.z)
+
         print '\n The target coordinate is: %s \n' %tarPose 
+
         jointTarg = self.get_IK(tarPose,arm)
+        print jointTarg
         planTraj = self.plan_jointTargetInput(jointTarg,arm)
         if(planTraj!=None):
           print "going to angle " + str(angle)   
           self.group[arm].execute(planTraj)
-          print str(arm) + "arm"
           time.sleep(5)
           # r = requests.get("http://10.5.5.9/gp/gpControl/command/shutter?p=1")  
 
@@ -237,7 +223,7 @@ class ArmMoveIt:
 
     self.publish_point(center,0,1.2 )
     jump = 30 #hard coded for now
-    self.execute_circle(jump,rad_outer,center,-.15,0)
+    self.execute_circle(jump,rad_outer,center,0.15,0)
 
 
 def main():
