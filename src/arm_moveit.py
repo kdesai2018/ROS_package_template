@@ -43,7 +43,7 @@ class ArmMoveIt:
     ## to one group of joints.  In this case the group is the joints in the left
     ## arm.  This interface can be used to plan and execute   motions on the left
     ## arm.
-    self.group = [moveit_commander.MoveGroupCommander("right_arm")] #change this to right_arm or left_arm
+    self.group = [moveit_commander.MoveGroupCommander("left_arm")] #change this to right_arm or left_arm
 
     # Set the planner
     self.planner = default_planner
@@ -79,7 +79,7 @@ class ArmMoveIt:
     wkPose.header.stamp=rospy.Time.now()
     wkPose.pose=newPose
 
-    msgs_request = moveit_msgs.msg.PositionIKRequest()
+    msgs_request = moveit_ msgs.msg.PositionIKRequest()
     msgs_request.group_name = 'left_arm'; # takes in left_arm as argument at all times.
     # msgs_request.ik_link_name = self.group[n].get_name()
     print self.group[n].get_name()
@@ -201,7 +201,7 @@ class ArmMoveIt:
 
     tarPose = geometry_msgs.msg.Pose()
 
-    for angle in range(-140,-139,jump):
+    for angle in range(-170,-169,jump):
         tarPose.position = self.calc_mov(angle,radius,center,z)
         tarPose.orientation = self.calc_orientation(angle)
         self.publish_point(tarPose.position.x,tarPose.position.y,tarPose.position.z)
