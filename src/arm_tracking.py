@@ -67,7 +67,8 @@ class TagTracking:
     self.kinect_angle_pub = rospy.Publisher('/tilt_controller/command',Float64)
     rospy.sleep(1)
     self.kinect_angle = Float64()
-    self.kinect_angle.data = 0.3925
+    # self.kinect_angle.data = 0.3925
+    self.kinect_angle.data = 0
     self.kinect_angle_pub.publish(self.kinect_angle)
 
     rospy.Subscriber('/ar_pose_marker', AlvarMarkers, self.arPoseMarkerCallback)
@@ -182,8 +183,8 @@ class TagTracking:
       pose.pose.position.y = -mark.pose.pose.position.x
       pose.pose.position.z = -mark.pose.pose.position.y
       pose.pose.orientation.x = mark.pose.pose.orientation.z
-      pose.pose.orientation.y = mark.pose.pose.orientation.x
-      pose.pose.orientation.z = mark.pose.pose.orientation.y
+      pose.pose.orientation.y = -mark.pose.pose.orientation.x
+      pose.pose.orientation.z = -mark.pose.pose.orientation.y
       pose.pose.orientation.w = mark.pose.pose.orientation.w
       self.gotInit = True
       # print pose
@@ -198,7 +199,7 @@ class TagTracking:
       # print [self.currentMarkerPose[2]+self.trans[0],self.currentMarkerPose[0]+self.trans[1],self.currentMarkerPose[1]-self.trans[2]]
       # self.publish_point(self.currentMarkerPose[2]+self.trans[0],self.currentMarkerPose[0]+self.trans[1],self.currentMarkerPose[1]-self.trans[2])
       # return [self.currentMarkerPose[2]+self.trans[0],self.currentMarkerPose[0]+self.trans[1],self.currentMarkerPose[1]-self.trans[2]]
-      while(not self.gotInit):
+      while(not self.gotInit and not rospy.is_shutdown()):
         1==1
       print "got init doing transform"
       return tf2_geometry_msgs.do_transform_pose(self.currentMarkerPose,self.trans)
@@ -209,69 +210,89 @@ class TagTracking:
       return rpy
   def getRobotCurrentState(self):
     pos = self.group[0].get_current_pose().pose
-    state = [0]*3
-    state[0] = pos.position.x
-    state[1] = pos.position.y
-    state[2] = pos.position.z
+    # state = [0]*3
+    # state[0] = pos.position.x
+    # state[1] = pos.position.y
+    # state[2] = pos.position.z
     # orientation = self.quat_to_rpy([pos.orientation.x,pos.orientation.y,pos.orientation.z,pos.orientation.w])
     # state[3] = orientation[0]
     # state[4] = orientation[1]
     # state[5] = orientation[2]
     # print "robot state"
     # print state
-    return state
+    return pos
 
-  def publish_point(self, x,y,z):
+  def get_goal_pos(self,marker_pos,robot_pos,goal):
+
+    tf_marker_pos = tf2_geometry_msgs.fromMsg(marker_pos)
+    tf_robot_pos = tf2_geometry_msgs.fromMsg(robot_pos)
+    diff = tf_marker_pos.inverseTimes(tf_robot_pos)
+    print diff
+
+  def publish_point(self, pose):
     marker = Marker()
-    marker.type = marker.SPHERE
+    marker.type = marker.CUBE
     marker.action = marker.ADD
-    marker.scale.x = 0.05
-    marker.scale.y = 0.05
-    marker.scale.z = 0.05
+    marker.scale.x = 0.1
+    marker.scale.y = 0.3
+    marker.scale.z = 0.1
     marker.color.a = 1.0
-    marker.color.r = 1.0
+    marker.color.r = 0.5
+    marker.color.b=1.0
     marker.pose.orientation.w = 1.0
-    marker.pose.position.x = x
-    marker.pose.position.y = y
-    marker.pose.position.z = z
+    marker.pose.position.x = pose[0]
+    marker.pose.position.y = pose[1]
+    marker.pose.position.z = pose[2]
+    marker.pose.orientation.x = pose[3]
+    marker.pose.orientation.y = pose[4]
+    marker.pose.orientation.z = pose[5]
+    marker.pose.orientation.w = pose[6]
     marker.header.frame_id = "/linear_actuator_link"
     # print self.marker
-    # self.markerArray = MarkerArray()
-    self.markerArray.markers.append(marker)
+    markerArray = MarkerArray()
+    markerArray.markers.append(marker)
 
     id = 0
     for m in self.markerArray.markers:
       m.id = id
       id += 1
     # print self.markerArray
-    self.publisher.publish(self.markerArray)
+    self.publisher.publish(markerArray)
     
 def main():
   tagTracker = TagTracking()
-  if (not(rospy.is_shutdown())):
+  counter = 0
+  while (not(rospy.is_shutdown())):
     # tagTracker.printMarkerPose()
-    tarPose = tagTracker.getInitMarkerPose().pose
-    # robot_pos = tagTracker.getRobotCurrentState()
+    marker_pos = tagTracker.getInitMarkerPose().pose
+    robot_pos = tagTracker.getRobotCurrentState()
     # diff = tagTracker.diffEE_AR(robot_pos,init_pos)
     # tarPose = geometry_msgs.msg.Pose()
 
     # tarPose.orientation.x = 0
     # tarPose.orientation.y = 0
-    # tarPose.orientation.z = 0
-    # tarPose.orientation.w = 1
+    goal = [1,0.1,0.25]
+    tagTracker.get_goal_pos(marker_pos,robot_pos,goal)
+    while(not rospy.is_shutdown()):
+      1==1
+    tarPose.orientation.z = 0
+    tarPose.orientation.w = 1
 
     # position = map(operator.add,tagTracker.goalMarkerPose,diff)
     # tarPose.position.x = init_pos[0]
     # tarPose.position.y = init_pos[1]
     # tarPose.position.z = init_pos[2]
-    print "target position"
+    # print "target position"
     print tarPose
-    tagTracker.publish_point(tarPose.position.x,tarPose.position.y,tarPose.position.z)
+    tagTracker.publish_point([tarPose.position.x,tarPose.position.y,tarPose.position.z,tarPose.orientation.x,tarPose.orientation.y,tarPose.orientation.z,tarPose.orientation.w])
+    # print tarPose
     jointTarg = tagTracker.get_IK(tarPose,0)
     planTraj = tagTracker.plan_jointTargetInput(jointTarg,0)
     if(planTraj!=None):
           tagTracker.group[0].execute(planTraj)
-    rospy.sleep(0.2)
+    print "done" + str(counter)
+    counter+=1
+    rospy.sleep(15)
   ## ask if integrate object scene from code or not
   
     ##   Assigned tarPose the current Pose of the robot 
