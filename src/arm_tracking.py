@@ -178,14 +178,23 @@ class TagTracking:
       # p[1] = mark.pose.pose.position.y #height
       # p[2] = mark.pose.pose.position.z #depth
       pose = PoseStamped()
+      # pose.header = mark.header
+      # pose.pose.position.x = mark.pose.pose.position.z
+      # pose.pose.position.y = -mark.pose.pose.position.x
+      # pose.pose.position.z = -mark.pose.pose.position.y
+      # pose.pose.orientation.x = mark.pose.pose.orientation.z
+      # pose.pose.orientation.y = -mark.pose.pose.orientation.x
+      # pose.pose.orientation.z = -mark.pose.pose.orientation.y
+      # pose.pose.orientation.w = mark.pose.pose.orientation.w
       pose.header = mark.header
-      pose.pose.position.x = mark.pose.pose.position.z
-      pose.pose.position.y = -mark.pose.pose.position.x
-      pose.pose.position.z = -mark.pose.pose.position.y
-      pose.pose.orientation.x = mark.pose.pose.orientation.z
-      pose.pose.orientation.y = -mark.pose.pose.orientation.x
-      pose.pose.orientation.z = -mark.pose.pose.orientation.y
+      pose.pose.position.x = mark.pose.pose.position.x
+      pose.pose.position.y = mark.pose.pose.position.y
+      pose.pose.position.z = mark.pose.pose.position.z
+      pose.pose.orientation.x = mark.pose.pose.orientation.x
+      pose.pose.orientation.y = mark.pose.pose.orientation.y
+      pose.pose.orientation.z = mark.pose.pose.orientation.z
       pose.pose.orientation.w = mark.pose.pose.orientation.w
+
       self.gotInit = True
       # print pose
       self.currentMarkerPose = pose
@@ -286,13 +295,13 @@ def main():
     print tarPose
     tagTracker.publish_point([tarPose.position.x,tarPose.position.y,tarPose.position.z,tarPose.orientation.x,tarPose.orientation.y,tarPose.orientation.z,tarPose.orientation.w])
     # print tarPose
-    jointTarg = tagTracker.get_IK(tarPose,0)
-    planTraj = tagTracker.plan_jointTargetInput(jointTarg,0)
-    if(planTraj!=None):
-          tagTracker.group[0].execute(planTraj)
+    # jointTarg = tagTracker.get_IK(tarPose,0)
+    # planTraj = tagTracker.plan_jointTargetInput(jointTarg,0)
+    # if(planTraj!=None):
+    #       tagTracker.group[0].execute(planTraj)
     print "done" + str(counter)
     counter+=1
-    rospy.sleep(15)
+    rospy.sleep(3)
   ## ask if integrate object scene from code or not
   
     ##   Assigned tarPose the current Pose of the robot 
