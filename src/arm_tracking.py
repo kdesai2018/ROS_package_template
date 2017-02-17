@@ -67,12 +67,12 @@ class TagTracking:
     self.kinect_angle_pub = rospy.Publisher('/tilt_controller/command',Float64)
     rospy.sleep(1)
     self.kinect_angle = Float64()
-    # self.kinect_angle.data = 0.3925
-    self.kinect_angle.data = 0
+    self.kinect_angle.data = 0.3925
+    # self.kinect_angle.data = 0
     self.kinect_angle_pub.publish(self.kinect_angle)
 
     rospy.Subscriber('/ar_pose_marker', AlvarMarkers, self.arPoseMarkerCallback)
-    self.currentMarkerPose = [0]*3
+    self.currentMarkerPose = geometry_msgs.msg.PoseStamped()
     self.goalMarkerPose = [1,0,0] #to be determined before running experiment
     tfBuffer = tf2_ros.Buffer()
     listener = tf2_ros.TransformListener(tfBuffer)
@@ -178,22 +178,26 @@ class TagTracking:
       # p[1] = mark.pose.pose.position.y #height
       # p[2] = mark.pose.pose.position.z #depth
       pose = PoseStamped()
-      # pose.header = mark.header
-      # pose.pose.position.x = mark.pose.pose.position.z
-      # pose.pose.position.y = -mark.pose.pose.position.x
-      # pose.pose.position.z = -mark.pose.pose.position.y
-      # pose.pose.orientation.x = mark.pose.pose.orientation.z
-      # pose.pose.orientation.y = -mark.pose.pose.orientation.x
-      # pose.pose.orientation.z = -mark.pose.pose.orientation.y
-      # pose.pose.orientation.w = mark.pose.pose.orientation.w
       pose.header = mark.header
-      pose.pose.position.x = mark.pose.pose.position.x
-      pose.pose.position.y = mark.pose.pose.position.y
-      pose.pose.position.z = mark.pose.pose.position.z
-      pose.pose.orientation.x = mark.pose.pose.orientation.x
-      pose.pose.orientation.y = mark.pose.pose.orientation.y
-      pose.pose.orientation.z = mark.pose.pose.orientation.z
+      pose.pose.position.x = mark.pose.pose.position.z
+      pose.pose.position.y = -mark.pose.pose.position.x
+      pose.pose.position.z = -mark.pose.pose.position.y
+      pose.pose.orientation.x = mark.pose.pose.orientation.z
+      pose.pose.orientation.y = -mark.pose.pose.orientation.x
+      pose.pose.orientation.z = -mark.pose.pose.orientation.y
       pose.pose.orientation.w = mark.pose.pose.orientation.w
+
+      # pose.header = mark.header
+      # pose.pose.position.x = mark.pose.pose.position.x
+      # pose.pose.position.y = mark.pose.pose.position.y
+      # pose.pose.position.z = mark.pose.pose.position.z
+      # pose.pose.orientation.x = mark.pose.pose.orientation.x
+      # pose.pose.orientation.y = mark.pose.pose.orientation.y
+      # pose.pose.orientation.z = mark.pose.pose.orientation.z
+      # pose.pose.orientation.w = mark.pose.pose.orientation.w
+
+      if(pose.pose == self.currentMarkerPose):
+        pass
 
       self.gotInit = True
       # print pose
@@ -231,12 +235,30 @@ class TagTracking:
     # print state
     return pos
 
-  def get_goal_pos(self,marker_pos,robot_pos,goal):
+  def get_goal_pos(self,marker_pos,robot_pos,goal_pos):
 
-    tf_marker_pos = tf2_geometry_msgs.fromMsg(marker_pos)
-    tf_robot_pos = tf2_geometry_msgs.fromMsg(robot_pos)
-    diff = tf_marker_pos.inverseTimes(tf_robot_pos)
-    print diff
+    # tf_marker_pos = tf2_geometry_msgs.fromMsg(marker_pos)
+    # tf_robot_pos = tf2_geometry_msgs.fromMsg(robot_pos)
+    diff = geometry_msgs.msg.Pose()
+    diff.position.x = marker_pos.position.x-robot_pos.position.x
+    diff.position.y = marker_pos.position.y-robot_pos.position.y
+    diff.position.z = marker_pos.position.z-robot_pos.position.z
+
+    diff.orientation.x = marker_pos.orientation.x-robot_pos.orientation.x
+    diff.orientation.y = marker_pos.orientation.y-robot_pos.orientation.y
+    diff.orientation.z = marker_pos.orientation.z-robot_pos.orientation.z
+    diff.orientation.w = marker_pos.orientation.w-robot_pos.orientation.w
+
+    goal_pos.position.x += diff.position.x
+    goal_pos.position.y += diff.position.y
+    goal_pos.position.z += diff.position.z
+    # goal_pos.orientation.x += diff.orientation.x
+    # goal_pos.orientation.y += diff.orientation.y
+    # goal_pos.orientation.z += diff.orientation.z
+    # goal_pos.orientation.w += diff.orientation.w
+    # print "diff:"
+    # print diff
+    return goal_pos
 
   def publish_point(self, pose):
     marker = Marker()
@@ -280,28 +302,37 @@ def main():
 
     # tarPose.orientation.x = 0
     # tarPose.orientation.y = 0
-    goal = [1,0.1,0.25]
-    tagTracker.get_goal_pos(marker_pos,robot_pos,goal)
-    while(not rospy.is_shutdown()):
-      1==1
-    tarPose.orientation.z = 0
-    tarPose.orientation.w = 1
+    goal_pos = geometry_msgs.msg.Pose()
+    goal_pos.position.x = 1
+    goal_pos.position.y = 0.1
+    goal_pos.position.z = 0.2
+    goal_pos.orientation.x = 0
+    goal_pos.orientation.y = 0
+    goal_pos.orientation.z = 0
+    goal_pos.orientation.w = 1
+
+    goal = tagTracker.get_goal_pos(marker_pos,robot_pos,goal_pos)
+
+    goal.orientation.z = 0
+    goal.orientation.w = 1
 
     # position = map(operator.add,tagTracker.goalMarkerPose,diff)
     # tarPose.position.x = init_pos[0]
     # tarPose.position.y = init_pos[1]
     # tarPose.position.z = init_pos[2]
     # print "target position"
-    print tarPose
-    tagTracker.publish_point([tarPose.position.x,tarPose.position.y,tarPose.position.z,tarPose.orientation.x,tarPose.orientation.y,tarPose.orientation.z,tarPose.orientation.w])
-    # print tarPose
-    # jointTarg = tagTracker.get_IK(tarPose,0)
-    # planTraj = tagTracker.plan_jointTargetInput(jointTarg,0)
-    # if(planTraj!=None):
-    #       tagTracker.group[0].execute(planTraj)
+    # print marker_pos
+    tagTracker.publish_point([goal_pos.position.x,goal_pos.position.y,goal_pos.position.z,goal_pos.orientation.x,goal_pos.orientation.y,goal_pos.orientation.z,goal_pos.orientation.w])
+    tagTracker.publish_point([marker_pos.position.x,marker_pos.position.y,marker_pos.position.z,marker_pos.orientation.x,marker_pos.orientation.y,marker_pos.orientation.z,marker_pos.orientation.w])
+    print "goal"
+    print goal
+    jointTarg = tagTracker.get_IK(goal,0)
+    planTraj = tagTracker.plan_jointTargetInput(jointTarg,0)
+    if(planTraj!=None):
+          tagTracker.group[0].execute(planTraj)
     print "done" + str(counter)
     counter+=1
-    rospy.sleep(3)
+    rospy.sleep(10)
   ## ask if integrate object scene from code or not
   
     ##   Assigned tarPose the current Pose of the robot 
