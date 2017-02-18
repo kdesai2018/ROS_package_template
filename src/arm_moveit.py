@@ -63,7 +63,6 @@ class ArmMoveIt:
     self.markerArray = MarkerArray()
 
 
-    
 
   def get_IK(self, newPose,n, root = None):
     ## from a defined newPose (geometry_msgs.msg.Pose()), retunr its correspondent joint angle(list)
