@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import sys
 import rospy
 import moveit_commander
@@ -11,7 +10,7 @@ import wpi_jaco_msgs.msg
 import wpi_jaco_msgs.srv
 import time
 import operator
-
+from vector_msgs.msg import JacoCartesianVelocityCmd, LinearActuatorCmd, GripperCmd, GripperStat
 import requests
 import tf2_ros
 import tf2_geometry_msgs
@@ -22,6 +21,67 @@ from visualization_msgs.msg import *
 from std_msgs.msg import *
 from math import pi, floor, ceil, fabs, sin, cos, radians,degrees
 import numpy
+
+class Gripper:
+  def __init__(self, prefix='right'):
+    self.pub_grp  = rospy.Publisher('/vector/'+prefix+'_gripper/cmd', GripperCmd, queue_size = 10)
+    self.cmd = GripperCmd()
+    
+    #i have it here but it is not useful
+    #rospy.Subscriber('/vector/right_gripper/joint_states', JointState, self.js_cb)
+    #self.last_js_update = None
+    #self.joint_state = None
+    
+    rospy.Subscriber('/vector/'+prefix+'_gripper/stat', GripperStat, self.st_cb)
+    self.last_st_update = None
+    self.gripper_stat = GripperStat()
+    
+
+  #def js_cb(self, inState):
+  #  self.joint_state = inState.position  
+  #  self.last_js_update = rospy.get_time()
+    
+  def st_cb(self, inStat):
+    self.gripperStat = inStat
+    self.last_st_update = None
+    
+  def is_ready(self):
+    return self.gripperStat.is_ready
+  
+  def is_reset(self):
+    return self.gripperStat.is_reset
+
+  def is_moving(self):
+    return self.gripperStat.is_moving
+    
+  def object_detected(self):
+    return self.gripperStat.obj_detected
+    
+  def get_pos(self):
+    return self.gripperStat.position
+    
+  def get_commanded_pos(self):
+    return self.gripperStat.requested_position
+
+  def get_applied_current(self):
+    return self.gripperStat.current
+
+  def set_pos(self, position, speed = 0.02, force = 100, rate = 10, iterations = 5):
+    
+    self.cmd.position = position
+    self.cmd.speed = speed
+    self.cmd.force = force
+    rrate = rospy.Rate(rate)
+    for i in range(0,iterations):
+      self.pub_grp.publish(self.cmd)
+      rrate.sleep()  
+    
+  def open(self, speed = 0.02, force = 100):
+    self.set_pos(0.085,speed,force)
+    
+  def close(self, speed = 0.02, force = 10):
+    self.set_pos(0,speed,force)
+
 
 class TagTracking:
 
@@ -37,58 +97,40 @@ class TagTracking:
       exit()
     else:
       rospy.loginfo("MoveIt detected: arm planner loading")
-    # self.pose = geometry_msgs.msg.PoseStamped()
-    ## Instantiate a RobotCommander object.  This object is an interface to
-    ## the robot as a whole.
+
     self.robot = moveit_commander.RobotCommander()
 
-    ## Instantiate a PlanningSceneInterface object.  This object is an interface
-    ## to the world surrounding the robot.
     self.scene = moveit_commander.PlanningSceneInterface()
 
-    ## Instantiate a MoveGroupCommander object.  This object is an interface
-    ## to one group of joints.  In this case the group is the joints in the left
-    ## arm.  This interface can be used to plan and execute   motions on the left
-    ## arm.
     self.group = [moveit_commander.MoveGroupCommander("left_arm")] #change this to right_arm or left_arm
 
-    # Set the planner
     self.planner = default_planner
 
-    # Set the planning pose reference frame
     self.group[0].set_pose_reference_frame(planning_frame)
-    # self.group[1].set_pose_reference_frame(planning_frame)
-    # Set continuous joint names
+
     self.continuous_joints = ['right_shoulder_pan_joint','right_wrist_1_joint','right_wrist_2_joint','right_wrist_3_joint']
-    # NOTE: order that moveit currently is configured
-    # ['right_shoulder_pan_joint', 'right_shoulder_lift_joint', 'right_elbow_joint', 'right_wrist_1_joint', 'right_wrist_2_joint', 'right_wrist_3_joint']
     self.continuous_joints_list = [0,3,4,5] # joints that are continous
 
     self.kinect_angle_pub = rospy.Publisher('/tilt_controller/command',Float64)
+    tfBuffer = tf2_ros.Buffer()
+    listener = tf2_ros.TransformListener(tfBuffer)
+    self.publisher = rospy.Publisher('visualization_marker_array', MarkerArray)
+
     rospy.sleep(1)
     self.kinect_angle = Float64()
     self.kinect_angle.data = 0.3925
-    # self.kinect_angle.data = 0
     self.kinect_angle_pub.publish(self.kinect_angle)
 
     # rospy.Subscriber('/ar_pose_marker', AlvarMarkers, self.arPoseMarkerCallback)
     self.currentMarkerPose = geometry_msgs.msg.PoseStamped()
-    self.goalMarkerPose = [1,0,0] #to be determined before running experiment
-    tfBuffer = tf2_ros.Buffer()
-    listener = tf2_ros.TransformListener(tfBuffer)
-    rospy.sleep(2)
+    
     self.trans = tfBuffer.lookup_transform("linear_actuator_link","kinect_link",rospy.Time(0))
     self.gotInit=False
-    # self.trans = [trans.transform.translation.x,trans.transform.translation.y,trans.transform.translation.z,trans.transform.rotation.x,trans.transform.rotation.y,trans.transform.rotation.z,trans.transform.rotation.w]
-    # print self.trans
-
-    topic = 'visualization_marker_array'
-    self.publisher = rospy.Publisher(topic, MarkerArray)
-    rospy.sleep(1)
+    self.gripper = Gripper()
     self.markerArray = MarkerArray()
 
   def _simplify_angle(self, angle):
-    # Very simple function that makes sure the angles are between -pi and pi
+  # Very simple function that makes sure the angles are between -pi and pi
     if angle > pi:
       while angle > pi:
         angle -= 2*pi
@@ -187,35 +229,59 @@ class TagTracking:
     except rospy.ServiceException, e:
       print "Service call failed: %s"%e
 
+
+  def publish_point(self, pose,color):
+    marker = Marker()
+    marker.type = marker.CUBE
+    marker.action = marker.ADD
+    marker.scale.x = 0.1
+    marker.scale.y = 0.3
+    marker.scale.z = 0.1
+    marker.color.a = 1.0
+    marker.color.r = color[0]
+    marker.color.g= color[1]
+    marker.color.b = color[2]
+    marker.pose = pose
+    marker.header.frame_id = "/linear_actuator_link"
+    # print self.marker
+    # markerArray = MarkerArray()
+    self.markerArray.markers.append(marker)
+
+    id = 0
+    for m in self.markerArray.markers:
+      m.id = id
+      id += 1
+    # print self.markerArray
+    self.publisher.publish(self.markerArray)
+
   def arPoseMarkerCallback(self,msg):
     if(len(msg.markers)>0):
       mark = msg.markers[0]
-      # p = [0]*3
-      # p[0] = mark.pose.pose.position.x #width
-      # p[1] = mark.pose.pose.position.y #height
-      # p[2] = mark.pose.pose.position.z #depth
-      pose = PoseStamped()
-      pose.header = mark.header
-      pose.pose.position.x = mark.pose.pose.position.z
-      pose.pose.position.y = -mark.pose.pose.position.x
-      pose.pose.position.z = -mark.pose.pose.position.y
-      pose.pose.orientation.x = mark.pose.pose.orientation.z
-      pose.pose.orientation.y = -mark.pose.pose.orientation.x
-      pose.pose.orientation.z = -mark.pose.pose.orientation.y
-      pose.pose.orientation.w = mark.pose.pose.orientation.w
 
-      # pose.header = mark.header
-      # pose.pose.position.x = mark.pose.pose.position.x
-      # pose.pose.position.y = mark.pose.pose.position.y
-      # pose.pose.position.z = mark.pose.pose.position.z
-      # pose.pose.orientation.x = mark.pose.pose.orientation.x
-      # pose.pose.orientation.y = mark.pose.pose.orientation.y
-      # pose.pose.orientation.z = mark.pose.pose.orientation.z
+      pose.header = mark.header
+
+      #config for simulation with kinect 2
+      # pose.pose.position.x = mark.pose.pose.position.z
+      # pose.pose.position.y = -mark.pose.pose.position.x
+      # pose.pose.position.z = -mark.pose.pose.position.y
+      # pose.pose.orientation.x = mark.pose.pose.orientation.z
+      # pose.pose.orientation.y = -mark.pose.pose.orientation.x
+      # pose.pose.orientation.z = -mark.pose.pose.orientation.y
       # pose.pose.orientation.w = mark.pose.pose.orientation.w
 
+      pose.pose.position.x = mark.pose.pose.position.x
+      pose.pose.position.y = mark.pose.pose.position.y
+      pose.pose.position.z = mark.pose.pose.position.z
+      pose.pose.orientation.x = mark.pose.pose.orientation.x
+      pose.pose.orientation.y = mark.pose.pose.orientation.y
+      pose.pose.orientation.z = mark.pose.pose.orientation.z
+      pose.pose.orientation.w = mark.pose.pose.orientation.w
+
       if(pose.pose == self.currentMarkerPose):
+        
         pass
 
+      print "callback"
       self.gotInit = True
       # print pose
       self.currentMarkerPose = pose
@@ -228,6 +294,7 @@ class TagTracking:
       while(not self.gotInit and not rospy.is_shutdown()):
         1==1
       print "got init doing transform"
+      # return tf2_geometry_msgs.do_transform_pose(self.currentMarkerPose,self.trans)
       return self.currentMarkerPose
       
 
@@ -238,9 +305,7 @@ class TagTracking:
   def get_goal_pos(self,marker_pos,robot_pos,goal_pos):
 
     diff = geometry_msgs.msg.Pose()
-    # diff.position.x = 0
-    # diff.position.y = 0
-    # diff.position.z = 0
+
 
     angleRobot = tf.transformations.euler_from_quaternion([robot_pos.orientation.x,robot_pos.orientation.y,robot_pos.orientation.z,robot_pos.orientation.w])
     raw_angleMarker = tf.transformations.euler_from_quaternion([marker_pos.orientation.x,marker_pos.orientation.y,marker_pos.orientation.z,marker_pos.orientation.w])
@@ -294,29 +359,6 @@ class TagTracking:
     print target
     return target
 
-  def publish_point(self, pose,color):
-    marker = Marker()
-    marker.type = marker.CUBE
-    marker.action = marker.ADD
-    marker.scale.x = 0.1
-    marker.scale.y = 0.3
-    marker.scale.z = 0.1
-    marker.color.a = 1.0
-    marker.color.r = color[0]
-    marker.color.g= color[1]
-    marker.color.b = color[2]
-    marker.pose = pose
-    marker.header.frame_id = "/linear_actuator_link"
-    # print self.marker
-    # markerArray = MarkerArray()
-    self.markerArray.markers.append(marker)
-
-    id = 0
-    for m in self.markerArray.markers:
-      m.id = id
-      id += 1
-    # print self.markerArray
-    self.publisher.publish(self.markerArray)
     
 def main():
   tagTracker = TagTracking()
@@ -362,6 +404,8 @@ def main():
     # tagTracker.publish_point(robot_pos,[1,0,1])
     # tagTracker.publish_point(goal_pos,[0,1,0])
     tagTracker.publish_point(marker_pos,[1,0,0])
+
+    tagTracker.gripper.close()
     # tagTracker.publish_point(goal,[0,0,1])
 
     # print "goal"

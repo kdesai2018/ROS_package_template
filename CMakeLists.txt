@@ -154,10 +154,7 @@ include_directories(
 ## in contrast to setup.py, you can choose the destination
 install(PROGRAMS
 #   bin/wpiJaco2vectorVelMap
-   bin/arm_upper_tuck
-   bin/arm_lower_tuck
-   bin/arm_untuck
-   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+
 )
 
 ## Mark executables and/or libraries for installation
