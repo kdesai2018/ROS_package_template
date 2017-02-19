@@ -22,67 +22,6 @@ from std_msgs.msg import *
 from math import pi, floor, ceil, fabs, sin, cos, radians,degrees
 import numpy
 
-class Gripper:
-  def __init__(self, prefix='right'):
-    self.pub_grp  = rospy.Publisher('/vector/'+prefix+'_gripper/cmd', GripperCmd, queue_size = 10)
-    self.cmd = GripperCmd()
-    
-    #i have it here but it is not useful
-    #rospy.Subscriber('/vector/right_gripper/joint_states', JointState, self.js_cb)
-    #self.last_js_update = None
-    #self.joint_state = None
-    
-    rospy.Subscriber('/vector/'+prefix+'_gripper/stat', GripperStat, self.st_cb)
-    self.last_st_update = None
-    self.gripper_stat = GripperStat()
-    
-
-  #def js_cb(self, inState):
-  #  self.joint_state = inState.position  
-  #  self.last_js_update = rospy.get_time()
-    
-  def st_cb(self, inStat):
-    self.gripperStat = inStat
-    self.last_st_update = None
-    
-  def is_ready(self):
-    return self.gripperStat.is_ready
-  
-  def is_reset(self):
-    return self.gripperStat.is_reset
-
-  def is_moving(self):
-    return self.gripperStat.is_moving
-    
-  def object_detected(self):
-    return self.gripperStat.obj_detected
-    
-  def get_pos(self):
-    return self.gripperStat.position
-    
-  def get_commanded_pos(self):
-    return self.gripperStat.requested_position
-
-  def get_applied_current(self):
-    return self.gripperStat.current
-
-  def set_pos(self, position, speed = 0.02, force = 100, rate = 10, iterations = 5):
-    
-    self.cmd.position = position
-    self.cmd.speed = speed
-    self.cmd.force = force
-    rrate = rospy.Rate(rate)
-    for i in range(0,iterations):
-      self.pub_grp.publish(self.cmd)
-      rrate.sleep()  
-    
-  def open(self, speed = 0.02, force = 100):
-    self.set_pos(0.085,speed,force)
-    
-  def close(self, speed = 0.02, force = 10):
-    self.set_pos(0,speed,force)
-
-
 class TagTracking:
 
   def __init__(self, planning_frame='linear_actuator_link', default_planner="RRTConnectkConfigDefault"):
@@ -126,7 +65,6 @@ class TagTracking:
     
     self.trans = tfBuffer.lookup_transform("linear_actuator_link","kinect_link",rospy.Time(0))
     self.gotInit=False
-    self.gripper = Gripper()
     self.markerArray = MarkerArray()
 
   def _simplify_angle(self, angle):
@@ -368,17 +306,17 @@ def main():
     robot_pos = tagTracker.get_FK()[0].pose
 
     # tagTracker.printMarkerPose()
-    # marker_pos = tagTracker.getInitMarkerPose().pose
-    marker_pos = geometry_msgs.msg.Pose()
-    marker_pos.position.x = 1
-    marker_pos.position.y = -0.2
-    marker_pos.position.z = 0.2
+    marker_pos = tagTracker.getInitMarkerPose().pose
+    # marker_pos = geometry_msgs.msg.Pose()
+    # marker_pos.position.x = 1
+    # marker_pos.position.y = -0.2
+    # marker_pos.position.z = 0.2
     
-    marker_angle = tf.transformations.quaternion_from_euler(radians(120),0,0)
-    marker_pos.orientation.x = marker_angle[0]
-    marker_pos.orientation.y = marker_angle[1]
-    marker_pos.orientation.z = marker_angle[2]
-    marker_pos.orientation.w = marker_angle[3]
+    # marker_angle = tf.transformations.quaternion_from_euler(radians(120),0,0)
+    # marker_pos.orientation.x = marker_angle[0]
+    # marker_pos.orientation.y = marker_angle[1]
+    # marker_pos.orientation.z = marker_angle[2]
+    # marker_pos.orientation.w = marker_angle[3]
 
     goal_angle = tf.transformations.quaternion_from_euler(radians(90),0,0)
     goal_pos = geometry_msgs.msg.Pose()
@@ -390,23 +328,17 @@ def main():
     goal_pos.orientation.z = goal_angle[2]
     goal_pos.orientation.w = goal_angle[3]
 
-    # goal = tagTracker.get_goal_pos(marker_pos,robot_pos,goal_pos)
+    goal = tagTracker.get_goal_pos(marker_pos,robot_pos,goal_pos)
 
-    # goal.orientation.z = 0
-    # goal.orientation.w = 1
+    goal.orientation.z = 0
+    goal.orientation.w = 1
 
-    # position = map(operator.add,tagTracker.goalMarkerPose,diff)
-    # tarPose.position.x = init_pos[0]
-    # tarPose.position.y = init_pos[1]
-    # tarPose.position.z = init_pos[2]
-    # print "target position"
-    # print marker_pos
-    # tagTracker.publish_point(robot_pos,[1,0,1])
-    # tagTracker.publish_point(goal_pos,[0,1,0])
+    
+    tagTracker.publish_point(robot_pos,[1,0,1])
+    tagTracker.publish_point(goal_pos,[0,1,0])
     tagTracker.publish_point(marker_pos,[1,0,0])
 
-    tagTracker.gripper.close()
-    # tagTracker.publish_point(goal,[0,0,1])
+    tagTracker.publish_point(goal,[0,0,1])
 
     # print "goal"
     # print goal
