@@ -38,7 +38,7 @@ class TagTracking:
       rospy.loginfo("MoveIt detected: arm planner loading")
 
     self.robot = moveit_commander.RobotCommander()
-
+    self.currentMarkerPose = geometry_msgs.msg.PoseStamped()
     self.scene = moveit_commander.PlanningSceneInterface()
 
     self.group = [moveit_commander.MoveGroupCommander("left_arm")] #change this to right_arm or left_arm
@@ -47,21 +47,21 @@ class TagTracking:
 
     self.group[0].set_pose_reference_frame(planning_frame)
 
-    self.continuous_joints = ['right_shoulder_pan_joint','right_wrist_1_joint','right_wrist_2_joint','right_wrist_3_joint']
-    self.continuous_joints_list = [0,3,4,5] # joints that are continous
+    self.continuous_joints = ['left_shoulder_pan_joint','left_wrist_1_joint','left_wrist_2_joint','left_wrist_3_joint']
+    self.continuous_joints_list = [0,3,4,5,6,9,10,11] # joints that are continous
 
     self.kinect_angle_pub = rospy.Publisher('/tilt_controller/command',Float64)
     tfBuffer = tf2_ros.Buffer()
     listener = tf2_ros.TransformListener(tfBuffer)
     self.publisher = rospy.Publisher('visualization_marker_array', MarkerArray)
-
-    rospy.sleep(1)
+    rospy.Subscriber('/ar_pose_marker', AlvarMarkers, self.arPoseMarkerCallback)
+    rospy.sleep(2)
     self.kinect_angle = Float64()
     self.kinect_angle.data = 0.3925
     self.kinect_angle_pub.publish(self.kinect_angle)
 
-    # rospy.Subscriber('/ar_pose_marker', AlvarMarkers, self.arPoseMarkerCallback)
-    self.currentMarkerPose = geometry_msgs.msg.PoseStamped()
+    
+    
     
     self.trans = tfBuffer.lookup_transform("linear_actuator_link","kinect_link",rospy.Time(0))
     self.gotInit=False
@@ -182,7 +182,7 @@ class TagTracking:
     marker.pose = pose
     marker.header.frame_id = "/linear_actuator_link"
     # print self.marker
-    # markerArray = MarkerArray()
+    #markerArray = MarkerArray()
     self.markerArray.markers.append(marker)
 
     id = 0
@@ -195,7 +195,7 @@ class TagTracking:
   def arPoseMarkerCallback(self,msg):
     if(len(msg.markers)>0):
       mark = msg.markers[0]
-
+      pose = geometry_msgs.msg.PoseStamped()
       pose.header = mark.header
 
       #config for simulation with kinect 2
@@ -301,7 +301,7 @@ class TagTracking:
 def main():
   tagTracker = TagTracking()
   counter = 0
-  while (not(rospy.is_shutdown())):
+  if (not(rospy.is_shutdown())):
     # print tagTracker.get_FK()[0].pose
     robot_pos = tagTracker.get_FK()[0].pose
 
@@ -318,34 +318,36 @@ def main():
     # marker_pos.orientation.z = marker_angle[2]
     # marker_pos.orientation.w = marker_angle[3]
 
-    goal_angle = tf.transformations.quaternion_from_euler(radians(90),0,0)
+    goal_angle = tf.transformations.quaternion_from_euler(0,0,0)
     goal_pos = geometry_msgs.msg.Pose()
-    goal_pos.position.x = 1
-    goal_pos.position.y = 0.1
-    goal_pos.position.z = 0.2
-    goal_pos.orientation.x = goal_angle[0]
-    goal_pos.orientation.y = goal_angle[1]
-    goal_pos.orientation.z = goal_angle[2]
-    goal_pos.orientation.w = goal_angle[3]
+    goal_pos.position.x = 1.077
+    goal_pos.position.y = 0.26
+    #goal_pos.position.z = 0.1136
+    goal_pos.position.z = -0.05
+    goal_pos.orientation.x =0
+    goal_pos.orientation.y = 0
+    goal_pos.orientation.z = 0
+    goal_pos.orientation.w = 1
 
-    goal = tagTracker.get_goal_pos(marker_pos,robot_pos,goal_pos)
+    #goal = tagTracker.get_goal_pos(marker_pos,robot_pos,goal_pos)
 
-    goal.orientation.z = 0
-    goal.orientation.w = 1
+    #goal.orientation.z = 0
+    #goal.orientation.w = 1
 
     
-    tagTracker.publish_point(robot_pos,[1,0,1])
+    #tagTracker.publish_point(robot_pos,[1,0,1])
     tagTracker.publish_point(goal_pos,[0,1,0])
-    tagTracker.publish_point(marker_pos,[1,0,0])
-
-    tagTracker.publish_point(goal,[0,0,1])
+    #tagTracker.publish_point(marker_pos,[1,0,0])
+    #tagTracker.publish_point(goal,[0,0,1])
 
     # print "goal"
     # print goal
-    # jointTarg = tagTracker.get_IK(goal,0)
-    # planTraj = tagTracker.plan_jointTargetInput(jointTarg,0)
-    # if(planTraj!=None):
-    #       tagTracker.group[0].execute(planTraj)
+    print goal_pos
+    jointTarg = tagTracker.get_IK(goal_pos,0)
+    planTraj = tagTracker.plan_jointTargetInput(jointTarg,0)
+    if(planTraj!=None):
+        #pass
+        tagTracker.group[0].execute(planTraj)
     print "done" + str(counter)
     counter+=1
     rospy.sleep(1)
@@ -357,6 +359,6 @@ def main():
 if __name__ == '__main__':
   ## First initialize moveit_commander and rospy.  
   moveit_commander.roscpp_initialize(sys.argv)
-  rospy.init_node('vector_basic_IK', anonymous=True)
+  rospy.init_node('arm_tracking', anonymous=True)
   main()
   rospy.spin()

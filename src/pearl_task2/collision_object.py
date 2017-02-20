@@ -31,13 +31,6 @@ class CollisionObject:
     # Make sure the moveit service is up and running
     rospy.logwarn("Starting up")
     # rospy.init_node("tag_track")
-    try:
-      rospy.wait_for_service('compute_ik')
-    except rospy.ROSExecption, e:
-      rospy.logerr("No moveit service detected. Exiting")
-      exit()
-    else:
-      rospy.loginfo("MoveIt detected: arm planner loading")
 
     self.robot = moveit_commander.RobotCommander()
 
@@ -131,13 +124,13 @@ class CollisionObject:
     pose.header.frame_id = "base_link"
     pose.pose.position.x = 1;
     pose.pose.position.y = 0;
-    pose.pose.position.z = -0.615;
+    pose.pose.position.z = 0.5;
     pose.pose.orientation.x = 0;
     pose.pose.orientation.y = 0;
     pose.pose.orientation.z = 0;
     pose.pose.orientation.w = 1;
 
-    scale = [0.62,1.23,.8]
+    scale = [0.62,1.23,1]
     self.scene.add_box("table",pose,scale)
     rospy.sleep(4)
 
