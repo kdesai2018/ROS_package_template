@@ -99,14 +99,14 @@ class CollisionObject:
     pose = geometry_msgs.msg.PoseStamped()
     pose.header.frame_id = "linear_actuator_link"
     pose.pose.position.x = 0.3;
-    pose.pose.position.y = -0.15;
+    pose.pose.position.y = -0.2;
     pose.pose.position.z = 0.2;
     pose.pose.orientation.x = 0;
     pose.pose.orientation.y = 0;
     pose.pose.orientation.z = 0;
     pose.pose.orientation.w = 1;
 
-    scale = [.4,.4,.6]
+    scale = [.4,.35,.6]
     self.scene.add_box("right_arm",pose,scale)
     rospy.sleep(4)
 
