@@ -50,7 +50,7 @@ class TagTracking:
     tfBuffer = tf2_ros.Buffer()
     listener = tf2_ros.TransformListener(tfBuffer)
     self.publisher = rospy.Publisher('visualization_marker_array', MarkerArray)
-    rospy.Subscriber('/ar_pose_marker', AlvarMarkers, self.arPoseMarkerCallback)
+    #rospy.Subscriber('/ar_pose_marker', AlvarMarkers, self.arPoseMarkerCallback)
     rospy.sleep(2)
     
     self.kinect_angle = Float64()
@@ -166,7 +166,7 @@ class TagTracking:
     marker.type = marker.CUBE
     marker.action = marker.ADD
     marker.scale.x = 0.1
-    marker.scale.y = 0.3
+    marker.scale.y = 0.1
     marker.scale.z = 0.1
     marker.color.a = 1.0
     marker.color.r = color[0]
@@ -239,7 +239,7 @@ class TagTracking:
 
     diff.position.x = robot_pos.position.x - marker_pos.position.x
     diff.position.y = robot_pos.position.y - marker_pos.position.y
-    diff.position.z = robot_pos.position.z - marker_pos.position.z + 0.1
+    diff.position.z = robot_pos.position.z - marker_pos.position.z
 
     angleRobot = tf.transformations.euler_from_quaternion([robot_pos.orientation.x,robot_pos.orientation.y,robot_pos.orientation.z,robot_pos.orientation.w])
     raw_angleMarker = tf.transformations.euler_from_quaternion([marker_pos.orientation.x,marker_pos.orientation.y,marker_pos.orientation.z,marker_pos.orientation.w])
@@ -295,11 +295,45 @@ class TagTracking:
       print "error exceeded bounds"
       return goal_pos
     
+  def go_home(self,count):
+
+    pos1 = geometry_msgs.msg.Pose()
+    pos1.position.x = 1.2048
+    pos1.position.y = 0.209
+    #goal_pos.position.z = 0.1136
+    pos1.position.z = 0.21
+    pos1.orientation.x =0.077
+    pos1.orientation.y = 0.0064
+    pos1.orientation.z = 0.044
+    pos1.orientation.w = 1
+
+    pos2 = geometry_msgs.msg.Pose()
+    pos2.position.x = 1.2048
+    pos2.position.y = 0.209
+    #goal_pos.position.z = 0.1136
+    pos2.position.z = 0.21  
+    pos2.orientation.x =0.077
+    pos2.orientation.y = 0.0064
+    pos2.orientation.z = 0.044
+    pos2.orientation.w = 1
+
+
+    if(count==1):
+       jointTarg = self.get_IK(pos1,0)
+    else:
+       joinTarg = self.get_IK(pos2,0)
+
+    planTraj = self.plan_jointTargetInput(jointTarg,0)
+    if(planTraj!=None):
+        self.group[0].execute(planTraj)
+
+
 
 
   def above_hole(self,goal_pos):
     pre_goal_pos = goal_pos
     pre_goal_pos.position.z = goal_pos.position.z+0.1
+    print pre_goal_pos
     self.publish_point(pre_goal_pos,[0,1,0])
 
     if(input("continue?")==-1):
@@ -311,8 +345,9 @@ class TagTracking:
         self.group[0].execute(planTraj)
 
   def in_hole(self,goal_pos):
+    goal_pos.position.z = goal_pos.position.z-0.1
     self.publish_point(goal_pos,[1,0,0])
-
+    print goal_pos
     if(input("continue?")==-1):
       return
 
@@ -325,15 +360,16 @@ class TagTracking:
 def main():
   tagTracker = TagTracking()
   counter = 0
-  if (not(rospy.is_shutdown())):
+  while (not(rospy.is_shutdown())):
     # print tagTracker.get_FK()[0].pose
  
 
     goal_angle = tf.transformations.quaternion_from_euler(0,0,0)
     goal_pos = geometry_msgs.msg.Pose()
-    goal_pos.position.x = 1.077
-    goal_pos.position.y = 0.26
-    goal_pos.position.z = -0.05
+    goal_pos.position.x = 1.135
+    goal_pos.position.y = 0.28
+    #goal_pos.position.z = 0.1136
+    goal_pos.position.z =-0.06
     goal_pos.orientation.x =0
     goal_pos.orientation.y = 0
     goal_pos.orientation.z = 0
@@ -342,23 +378,30 @@ def main():
     tagTracker.above_hole(goal_pos)
 
     robot_pos = tagTracker.get_FK()[0].pose
-    # marker_pos = tagTracker.getMarkerPose().pose
-    marker_pos = geometry_msgs.msg.Pose()
-    marker_pos.position.x = goal_pos.position.x
-    marker_pos.position.y = goal_pos.position.y
-    marker_pos.position.z = goal_pos.position.z+.1
+    #marker_pos = tagTracker.getMarkerPose().pose
+    marker_pos = goal_pos
+    #marker_pos = geometry_msgs.msg.Pose()
+    #marker_pos.position.x = goal_pos.position.x
+    #marker_pos.position.y = goal_pos.position.y
+    #marker_pos.position.z = goal_pos.position.z+.1
     
-    marker_angle = tf.transformations.quaternion_from_euler(0,50,0)
-    marker_pos.orientation.x = marker_angle[0]
-    marker_pos.orientation.y = marker_angle[1]
-    marker_pos.orientation.z = marker_angle[2]
-    marker_pos.orientation.w = marker_angle[3]
-    final_goal = tagTracker.get_goal_pos(marker_pos,robot_pos,goal_pos)
-    tagTracker.in_hole(final_goal)
+    #marker_angle = tf.transformations.quaternion_from_euler(0,50,0)
+    #marker_pos.orientation.x = marker_angle[0]
+    #marker_pos.orientation.y = marker_angle[1]
+    #marker_pos.orientation.z = marker_angle[2]
+    #marker_pos.orientation.w = marker_angle[3]
+    # final_goal = tagTracker.get_goal_pos(marker_pos,robot_pos,goal_pos)
+    tagTracker.in_hole(goal_pos)
 
     print "done" + str(counter)
     counter+=1
     rospy.sleep(1)
+
+    
+    if(input("continue?")==-1):
+      return
+    print "going home"
+    tagTracker.go_home(counter%2)
   ## ask if integrate object scene from code or not
   
     ##   Assigned tarPose the current Pose of the robot 

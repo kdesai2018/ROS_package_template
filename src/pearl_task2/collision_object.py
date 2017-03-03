@@ -122,15 +122,15 @@ class CollisionObject:
     self.publish_point(marker_pos,scale,[1,0,0])
 
     pose.header.frame_id = "base_link"
-    pose.pose.position.x = 1;
+    pose.pose.position.x = 1.4;
     pose.pose.position.y = 0;
-    pose.pose.position.z = 0.5;
+    pose.pose.position.z = 0.45;
     pose.pose.orientation.x = 0;
     pose.pose.orientation.y = 0;
     pose.pose.orientation.z = 0;
     pose.pose.orientation.w = 1;
 
-    scale = [0.62,1.23,1]
+    scale = [0.62,1.23,0.90]
     self.scene.add_box("table",pose,scale)
     rospy.sleep(4)
 

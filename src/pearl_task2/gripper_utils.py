@@ -24,7 +24,7 @@ from math import pi, floor, ceil, fabs, sin, cos, radians,degrees
 import numpy
 
 class Gripper:
-  def __init__(self, prefix='left'):
+  def __init__(self, prefix='right'):
     self.pub_grp  = rospy.Publisher('/vector/'+prefix+'_gripper/cmd', GripperCmd, queue_size = 10)
     self.cmd = GripperCmd()
     
